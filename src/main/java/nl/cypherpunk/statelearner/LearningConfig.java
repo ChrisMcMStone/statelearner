@@ -40,6 +40,9 @@ public class LearningConfig {
 	String learning_algorithm = "lstar";
 	String eqtest = "randomwords";
 	
+	//Handles lossy connections
+	boolean use_cache = false;
+	
 	// Used for W-Method and Wp-method
 	int max_depth = 10;
 	
@@ -100,5 +103,9 @@ public class LearningConfig {
 		
 		if(properties.getProperty("seed") != null)
 			seed = Integer.parseInt(properties.getProperty("seed"));		
+		
+		if(properties.getProperty("use_cache") != null)
+			use_cache = true;
+		
 	}
 }

@@ -23,6 +23,9 @@ import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.Statement;
 import java.util.Collection;
 import java.util.Random;
 import java.util.logging.ConsoleHandler;
@@ -36,12 +39,11 @@ import de.learnlib.algorithms.kv.mealy.KearnsVaziraniMealy;
 import de.learnlib.algorithms.lstargeneric.mealy.ExtensibleLStarMealyBuilder;
 import de.learnlib.algorithms.malerpnueli.MalerPnueliMealy;
 import de.learnlib.algorithms.rivestschapire.RivestSchapireMealy;
-import de.learnlib.algorithms.ttt.base.TTTState;
 import de.learnlib.algorithms.ttt.mealy.TTTLearnerMealy;
 import de.learnlib.api.EquivalenceOracle;
 import de.learnlib.api.LearningAlgorithm;
 import de.learnlib.api.SUL;
-import de.learnlib.cache.mealy.MealyCacheOracle;
+import nl.cypherpunk.modifiedcache.MealyCacheOracle;
 import de.learnlib.counterexamples.AcexLocalSuffixFinder;
 import de.learnlib.eqtests.basic.RandomWordsEQOracle.MealyRandomWordsEQOracle;
 import de.learnlib.eqtests.basic.WMethodEQOracle;
@@ -53,6 +55,7 @@ import de.learnlib.oracles.SULOracle;
 import de.learnlib.statistics.Counter;
 import de.learnlib.statistics.SimpleProfiler;
 import net.automatalib.automata.transout.MealyMachine;
+import net.automatalib.incremental.ConflictException;
 import net.automatalib.util.graphs.dot.GraphDOT;
 import net.automatalib.words.Word;
 import net.automatalib.words.impl.SimpleAlphabet;
@@ -85,6 +88,7 @@ public class Learner {
 	MealyCacheOracle<String, String> cachedEqOracle;
 	MealyCounterOracle<String, String> statsCachedEqOracle;
 	EquivalenceOracle<MealyMachine<?, String, ?, String>, String, Word<String>> equivalenceAlgorithm;
+	Connection dbConn;  // Caching DB
 	
 	public Learner(LearningConfig config) throws Exception {
 		this.config = config;
@@ -96,9 +100,10 @@ public class Learner {
 		}
 		
 		configureLogging(config.output_dir);
-		
 		LearnLogger log = LearnLogger.getLogger(Learner.class.getSimpleName());
-
+		
+		setUpdDBConn();
+		
 		// Check the type of learning we want to do and create corresponding configuration and SUL
 		if(config.type == LearningConfig.TYPE_SMARTCARD) {
 			log.log(Level.INFO, "Using smartcard SUL");	
@@ -130,11 +135,11 @@ public class Learner {
 		// Create the membership oracle
 		//memOracle = new SULOracle<String, String>(sul);
 		// Add a logging oracle
-		logMemOracle = new MealyLogOracle<String, String>(sul, LearnLogger.getLogger("learning_queries"));		
+		logMemOracle = new MealyLogOracle<String, String>(sul, LearnLogger.getLogger("learning_queries"), dbConn);		
         // Count the number of queries actually sent to the SUL
 		statsMemOracle = new MealyCounterOracle<String, String>(logMemOracle, "membership queries to SUL");
 		// Use cache oracle to prevent double queries to the SUL
-		//cachedMemOracle = MealyCacheOracle.createDAGCacheOracle(alphabet, statsMemOracle);
+		cachedMemOracle = MealyCacheOracle.createDAGCacheOracle(alphabet, null, statsMemOracle, dbConn);
         // Count the number of queries to the cache
 		statsCachedMemOracle = new MealyCounterOracle<String, String>(statsMemOracle, "membership queries to cache");
 		
@@ -175,7 +180,7 @@ public class Learner {
 		// Create the equivalence oracle
 		//eqOracle = new SULOracle<String, String>(sul);
 		// Add a logging oracle
-		logEqOracle = new MealyLogOracle<String, String>(sul, LearnLogger.getLogger("equivalence_queries"));
+		logEqOracle = new MealyLogOracle<String, String>(sul, LearnLogger.getLogger("equivalence_queries"), dbConn);
 		// Add an oracle that counts the number of queries
 		statsEqOracle = new MealyCounterOracle<String, String>(logEqOracle, "equivalence queries to SUL");
 		// Use cache oracle to prevent double queries to the SUL
@@ -342,15 +347,54 @@ public class Learner {
 		loggerEquivalenceQueries.addHandler(new ConsoleHandler());	
 	}
 	
+	
+	private void setUpdDBConn() throws Exception {
+		LearnLogger log = LearnLogger.getLogger(Learner.class.getSimpleName());
+		Class.forName("org.sqlite.JDBC");
+		this.dbConn = DriverManager.getConnection("jdbc:sqlite:cache.db");
+		Statement stmt = null;
+		stmt = dbConn.createStatement();
+		String sql = "CREATE TABLE IF NOT EXISTS CACHE" + "(ID INTEGER PRIMARY KEY, PREFIX_ID TEXT NOT NULL,"
+				+ "RESPONSE	TEXT	NOT NULL,  COUNT INT DEFAULT 0)"; //, CONSTRAINT xyz UNIQUE (PREFIX_ID))";
+		stmt.executeUpdate(sql);
+		stmt.close();
+		log.log(Level.INFO, "Successfully set up caching database");
+	}
+
+	
+	/*
+	 *  Resets internal learning algorithm if inconsistency detection and correction required.
+	 */
+	public void resetLearner() {
+		try {
+			loadLearningAlgorithm(config.learning_algorithm, alphabet, sul);
+			loadEquivalenceAlgorithm(config.eqtest, alphabet, sul);
+		} catch (Exception e) {
+			//This will never happen as Learning + Equivalence algorithm selection is already verified
+		}
+	}
+	
 	public static void main(String[] args) throws Exception {
 		if(args.length < 1) {
 			System.err.println("Invalid number of parameters");
 			System.exit(-1);
 		}
-		
 		LearningConfig config = new LearningConfig(args[0]);
-	
 		Learner learner = new Learner(config);
-		learner.learn();
+		
+		if(!config.use_cache) {
+			learner.learn();
+		} else {
+			//If we are using non-determinism cache handler
+			while(true) {
+				try {
+					learner.learn();
+				} catch (ConflictException e) {
+					// Note, currently if conflict occurs, logs and timers will be overwritten.
+					learner.resetLearner();
+					learner.learn();
+				}
+			}
+		}
 	}
 }
