@@ -33,6 +33,8 @@ import java.util.logging.FileHandler;
 import java.util.logging.Level;
 import java.util.logging.SimpleFormatter;
 
+import org.sqlite.core.DB;
+
 import de.learnlib.acex.analyzers.AcexAnalyzers;
 import de.learnlib.algorithms.dhc.mealy.MealyDHC;
 import de.learnlib.algorithms.kv.mealy.KearnsVaziraniMealy;
@@ -136,12 +138,12 @@ public class Learner {
 		//memOracle = new SULOracle<String, String>(sul);
 		// Add a logging oracle
 		logMemOracle = new MealyLogOracle<String, String>(sul, LearnLogger.getLogger("learning_queries"), dbConn);		
-        // Count the number of queries actually sent to the SUL
-		statsMemOracle = new MealyCounterOracle<String, String>(logMemOracle, "membership queries to SUL");
+//        // Count the number of queries actually sent to the SUL
+//		statsMemOracle = new MealyCounterOracle<String, String>(logMemOracle, "membership queries to SUL");
 		// Use cache oracle to prevent double queries to the SUL
-		cachedMemOracle = MealyCacheOracle.createDAGCacheOracle(alphabet, null, statsMemOracle, dbConn);
+		cachedMemOracle = MealyCacheOracle.createDAGCacheOracle(alphabet, null, logMemOracle, dbConn);
         // Count the number of queries to the cache
-		statsCachedMemOracle = new MealyCounterOracle<String, String>(statsMemOracle, "membership queries to cache");
+		statsCachedMemOracle = new MealyCounterOracle<String, String>(cachedMemOracle, "membership queries to cache");
 		
 		// Instantiate the selected learning algorithm
 		switch(algorithm.toLowerCase()) {
@@ -355,7 +357,7 @@ public class Learner {
 		Statement stmt = null;
 		stmt = dbConn.createStatement();
 		String sql = "CREATE TABLE IF NOT EXISTS CACHE" + "(ID INTEGER PRIMARY KEY, PREFIX_ID TEXT NOT NULL,"
-				+ "RESPONSE	TEXT	NOT NULL,  COUNT INT DEFAULT 0)"; //, CONSTRAINT xyz UNIQUE (PREFIX_ID))";
+				+ "RESPONSE	TEXT	NOT NULL,  COUNT INT DEFAULT 0, CONSTRAINT xyz UNIQUE (PREFIX_ID, RESPONSE))"; 
 		stmt.executeUpdate(sql);
 		stmt.close();
 		log.log(Level.INFO, "Successfully set up caching database");
@@ -392,7 +394,6 @@ public class Learner {
 				} catch (ConflictException e) {
 					// Note, currently if conflict occurs, logs and timers will be overwritten.
 					learner.resetLearner();
-					learner.learn();
 				}
 			}
 		}

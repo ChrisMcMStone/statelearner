@@ -48,6 +48,9 @@ import de.learnlib.cache.mealy.MealyCacheConsistencyTest;
 import de.learnlib.logging.LearnLogger;
 import de.learnlib.oracles.DefaultQuery;
 
+import nl.cypherpunk.statelearner.Utils;
+import nl.cypherpunk.statelearner.LogOracle.MealyLogOracle;
+
 /**
  * Mealy cache. This cache is implemented as a membership oracle: upon
  * construction, it is provided with a delegate oracle. Queries that can be
@@ -87,28 +90,26 @@ public class MealyCacheOracle<I, O> implements MealyLearningCacheOracle<I, O> {
 	}
 
 	public static <I, O> MealyCacheOracle<I, O> createDAGCacheOracle(Alphabet<I> inputAlphabet,
-			Mapping<? super O, ? extends O> errorSyms, MembershipOracle<I, Word<O>> delegate, Connection dbConn) {
+			Mapping<? super O, ? extends O> errorSyms, MealyLogOracle<I, O> delegate, Connection dbConn) {
 		IncrementalMealyBuilder<I, O> incrementalBuilder = new IncrementalMealyDAGBuilder<>(inputAlphabet);
 		return new MealyCacheOracle<>(incrementalBuilder, errorSyms, delegate, dbConn);
 	}
 
-	private final MembershipOracle<I, Word<O>> delegate;
+	private final MealyLogOracle<I, O> delegate;
 	private final IncrementalMealyBuilder<I, O> incMealy;
 	private final Lock incMealyLock;
 	private final Comparator<? super Query<I, ?>> queryCmp;
 	private final Mapping<? super O, ? extends O> errorSyms;
-	private boolean retryQuery = false;
-	private static final int RETRY_THRESHOLD = 3;
 	private Connection dbConn;
 	private LearnLogger log;
 
 	public MealyCacheOracle(IncrementalMealyBuilder<I, O> incrementalBuilder, Mapping<? super O, ? extends O> errorSyms,
-			MembershipOracle<I, Word<O>> delegate, Connection dbConn) {
+			MealyLogOracle<I, O> delegate, Connection dbConn) {
 		this(incrementalBuilder, new ReentrantLock(), errorSyms, delegate, dbConn);
 	}
 
 	public MealyCacheOracle(IncrementalMealyBuilder<I, O> incrementalBuilder, Lock lock,
-			Mapping<? super O, ? extends O> errorSyms, MembershipOracle<I, Word<O>> delegate, Connection dbConn) {
+			Mapping<? super O, ? extends O> errorSyms, MealyLogOracle<I, O> delegate, Connection dbConn) {
 		this.incMealy = incrementalBuilder;
 		this.incMealyLock = lock;
 		this.queryCmp = new ReverseLexCmp<>(incrementalBuilder.getInputAlphabet());
@@ -195,144 +196,65 @@ public class MealyCacheOracle<I, O> implements MealyLearningCacheOracle<I, O> {
 	}
 
 	private void postProcess(MasterQuery<I, O> master) {
-		Word<I> word = master.getSuffix();
+		Word<I> input_suffix = master.getSuffix();
 		Word<O> answer = master.getAnswer();
-		Word<I> query = master.getPrefix().concat(master.getSuffix());
-		List<DefaultQuery<I, Word<O>>> queries = null;
+		Word<I> input = master.getInput();
 
 		if (errorSyms == null) {
-			String inconsistentPrefix = null;
 			try {
-				incMealy.insert(word, answer);
+				incMealy.insert(input_suffix, answer);
 			} catch (ConflictException e) {
-				inconsistentPrefix = e.getMessage();
-				log.log(Level.INFO, "Detected non-determinsm prefix: " + inconsistentPrefix);
-				
-				//Update query counters or add new entry in cache
-				//Determine what is most common response to 'query'
-				//
+				// Assumes observation count already incremented.
 
-				return;
+				// Inconsistent query/response
+				String qr = e.getMessage();
+				// Inconsistent query
+				String iq = qr.substring(0, qr.indexOf(" / "));
+				// Inconsistent response
+				String ir = qr.substring(qr.indexOf(" / ") + 3);
+
+				// Get current most observed response
+				Word<O> common_response = Utils.cacheLookupQuery(iq, 0, dbConn);
+
+				// Check whether current model is wrong by testing equality between
+				// common_response and ir (inconsistent response)
+				if (common_response.toString().equals(ir)) {
+					// Correct Cache and Restart learning
+					Utils.correctDBcache(iq, ir, dbConn);
+					log.log(Level.INFO, "Deleting all cached queries with inconsisent prefix: " + iq);
+					throw new ConflictException("Failed initial consistency correction, deleted all prefixes");
+				} else {
+					// Retry
+					MasterQuery<I, O> retry = createMasterQuery(input);
+					//Ask query, dont use cache
+					Word<O> output = delegate.answerQuery(Word.epsilon(),retry.getInput(), false);
+					retry.answer(output);
+					incMealyLock.lock();
+					try {
+						postProcess(retry);
+					} finally {
+						incMealyLock.unlock();
+					}
+				}
+			}
+		} else {
+
+			// Never executed because errorsyms always null.
+			int answLen = answer.length();
+			int i = 0;
+			while (i < answLen) {
+				O sym = answer.getSymbol(i++);
+				if (errorSyms.get(sym) != null)
+					break;
+			}
+
+			if (i == answLen) {
+				incMealy.insert(input_suffix, answer);
+			} else {
+				incMealy.insert(input_suffix.prefix(i), answer.prefix(i));
 			}
 		}
-
-		// Never executed because errorsyms always null.
-		int answLen = answer.length();
-		int i = 0;
-		while (i < answLen) {
-			O sym = answer.getSymbol(i++);
-			if (errorSyms.get(sym) != null)
-				break;
-		}
-
-		if (i == answLen) {
-			incMealy.insert(word, answer);
-		} else {
-			incMealy.insert(word.prefix(i), answer.prefix(i));
-		}
 	}
-
-//	private void postProcess2(MasterQuery<I, O> master) {
-//		Word<I> word = master.getSuffix();
-//		Word<O> answer = master.getAnswer();
-//		Word<I> query = master.getPrefix().concat(master.getSuffix());
-//		List<DefaultQuery<I, Word<O>>> queries = null;
-//
-//		// errorSyms is always null in our set up. Therfore, at this conditional,
-//		// function either returns or throws exception
-//		if (errorSyms == null) {
-//			String inconsistentPrefix = null;
-//			// incMealy.insert(word, answer);
-//			try {
-//				incMealy.insert(word, answer);
-//			} catch (ConflictException e) {
-//				// Need to subtract from
-//				inconsistentPrefix = e.getMessage();
-//				log.log(Level.INFO, "Detected non-determinsm prefix: " + inconsistentPrefix);
-//
-//				this.retryQuery = true;
-//				master = new MasterQuery<I, O>(query);
-//				correctDBcache(query.toString());
-//				updateQueryCounters(query, false);
-//				int count = getQueryAttemptNo(inconsistentPrefix);
-//				if (count > 20) {
-//					for (int i = 0; i < count; i++) {
-//						try {
-//							Thread.sleep(i * 1000);
-//							System.out.println("Retrying big count " + i);
-//							log.log(Level.INFO, "Retrying big count " + i);
-//							delegate.processQuery(master);
-//							postProcess(master);
-//							for (Query<I, Word<O>> q : master.getSlaves()) {
-//								q = new DefaultQuery<>(query);
-//								q.answer(master.getAnswer());
-//							}
-//							// queries.get(0).getOutput();
-//							// If no exception thrown then consistent, break out of loop
-//							this.retryQuery = false;
-//							return;
-//						} catch (ConflictException b) {
-//							inconsistentPrefix = b.getMessage();
-//							correctDBcache(master.getPrefix().toString() + " " + master.getSuffix().toString());
-//							System.out.println("Retrying");
-//							continue;
-//						} catch (InterruptedException c) {
-//							// TODO
-//						}
-//					}
-//				} else {
-//					for (int i = 0; i < 3; i++) {
-//						try {
-//							Thread.sleep(1000);
-//							System.out.println("Retrying");
-//							System.out.println("Retrying small count " + i);
-//							log.log(Level.INFO, "Retrying small count " + i);
-//							delegate.processQuery(master);
-//							postProcess(master);
-//							for (Query<I, Word<O>> q : master.getSlaves()) {
-//								q = new DefaultQuery<>(query);
-//								q.answer(master.getAnswer());
-//							}
-//							// queries.get(0).getOutput();
-//							// If no exception thrown then consistent, break out of loop
-//							this.retryQuery = false;
-//							return;
-//						} catch (ConflictException b) {
-//							inconsistentPrefix = b.getMessage();
-//							correctDBcache(master.getPrefix().toString() + " " + master.getSuffix().toString());
-//							continue;
-//						} catch (InterruptedException c) {
-//							// TODO
-//						}
-//					}
-//					// If Retry_Threshold exceeded, delete from db cache
-//					if (inconsistentPrefix.equals("ASSOC(RSNE=cc) DELAY"))
-//						throw new ConflictException("Assoc delay inconsistent");
-//					correctDBcache(inconsistentPrefix);
-//					log.log(Level.INFO, "Deleting all cached queries with inconsisent prefix: " + inconsistentPrefix);
-//					throw new ConflictException("Failed initial consistency correction, deleted all prefixes");
-//				}
-//			}
-//			return;
-//		}
-//	}
-//
-//	int answLen = answer.length();
-//	int i = 0;while(i<answLen)
-//	{
-//		O sym = answer.getSymbol(i++);
-//		if (errorSyms.get(sym) != null)
-//			break;
-//	}
-//
-//	if(i==answLen)
-//	{
-//		incMealy.insert(word, answer);
-//	}else
-//	{
-//		incMealy.insert(word.prefix(i), answer.prefix(i));
-//	}
-//	}
 
 	private MasterQuery<I, O> createMasterQuery(Word<I> word) {
 		WordBuilder<O> wb = new WordBuilder<>();
@@ -351,62 +273,6 @@ public class MealyCacheOracle<I, O> implements MealyLearningCacheOracle<I, O> {
 
 		wb.repeatAppend(word.length() - wbSize, repSym);
 		return new MasterQuery<>(word, wb.toWord());
-	}
-
-	private int correctDBcache(String inconsistenPrefix) {
-		// TODO Auto-generated method stub
-		Statement stmt = null;
-		if (inconsistenPrefix.substring(0, 1).equals("ε"))
-			inconsistenPrefix = inconsistenPrefix.substring(2);
-		try {
-			stmt = dbConn.createStatement();
-			log.log(Level.INFO, "Removing rows with prefix_id = " + inconsistenPrefix);
-			System.out.println("Removing rows with prefix_id = " + inconsistenPrefix);
-			return stmt.executeUpdate("DELETE FROM CACHE WHERE PREFIX_ID LIKE \"" + inconsistenPrefix + "%\"");
-		} catch (Exception e) {
-			System.err.println(e.getClass().getName() + ": " + e.getMessage());
-		} finally {
-			try {
-				stmt.close();
-			} catch (SQLException e) {
-			}
-		}
-		return -1;
-	}
-
-	private void updateQueryCounters(Word<I> query, boolean increment) {
-		for (int i = 1; i < query.length() + 1; i++) {
-			Word<I> sub = query.prefix(i);
-			Statement stmt = null;
-			try {
-				stmt = dbConn.createStatement();
-				String op = "-";
-				if (increment)
-					op = "+";
-				stmt.executeUpdate(
-						"UPDATE CACHE SET COUNT = COUNT " + op + " 1 WHERE PREFIX_ID = \"" + sub.toString() + "\"");
-				stmt.close();
-			} catch (Exception e) {
-				System.out.println("No such query subword");
-			}
-		}
-	}
-
-	private int getQueryAttemptNo(String query) {
-		Statement stmt = null;
-		ResultSet rs = null;
-		try {
-			stmt = dbConn.createStatement();
-			rs = stmt.executeQuery("SELECT COUNT FROM CACHE WHERE PREFIX_ID = \"" + query + "\"");
-			stmt.close();
-			if (rs.next()) {
-				return rs.getInt("COUNT");
-			}
-		} catch (Exception e) {
-			System.out.println("No such query subword");
-			return 0;
-		}
-		return 0;
 	}
 
 }

@@ -45,17 +45,18 @@ import net.automatalib.words.Word;
 import net.automatalib.words.WordBuilder;
 
 /**
- * Incrementally builds an (acyclic) Mealy machine, from a set of input and corresponding
- * output words.
+ * Incrementally builds an (acyclic) Mealy machine, from a set of input and
+ * corresponding output words.
  * 
  * @author Malte Isberner
  *
- * @param <I> input symbol class
- * @param <O> output symbol class
+ * @param <I>
+ *            input symbol class
+ * @param <O>
+ *            output symbol class
  */
-public class IncrementalMealyDAGBuilder<I, O> extends
-	AbstractIncrementalMealyBuilder<I, O> {
-	
+public class IncrementalMealyDAGBuilder<I, O> extends AbstractIncrementalMealyBuilder<I, O> {
+
 	public class GraphView extends AbstractGraphView<I, O, State, TransitionRecord> {
 		@Override
 		public Collection<TransitionRecord> getOutgoingEdges(State node) {
@@ -66,80 +67,87 @@ public class IncrementalMealyDAGBuilder<I, O> extends
 			}
 			return edges;
 		}
+
 		@Override
 		public State getTarget(TransitionRecord edge) {
 			return edge.source.getSuccessor(edge.transIdx);
 		}
+
 		@Override
 		public Collection<State> getNodes() {
 			return Collections.unmodifiableCollection(register.values());
 		}
+
 		@Override
 		@Nullable
 		public I getInputSymbol(TransitionRecord edge) {
 			return inputAlphabet.getSymbol(edge.transIdx);
 		}
+
 		@Override
 		@Nullable
 		@SuppressWarnings("unchecked")
 		public O getOutputSymbol(TransitionRecord edge) {
-			return (O)edge.source.getOutput(edge.transIdx);
+			return (O) edge.source.getOutput(edge.transIdx);
 		}
+
 		@Override
 		@Nonnull
 		public State getInitialNode() {
 			return init;
 		}
+
 		@Override
 		public GraphDOTHelper<State, TransitionRecord> getGraphDOTHelper() {
 			return new DelegateDOTHelper<State, TransitionRecord>(super.getGraphDOTHelper()) {
 				private int id = 0;
+
 				@Override
-				public boolean getNodeProperties(State node,
-						Map<String, String> properties) {
-					if(!super.getNodeProperties(node, properties)) {
+				public boolean getNodeProperties(State node, Map<String, String> properties) {
+					if (!super.getNodeProperties(node, properties)) {
 						return false;
 					}
 					properties.put(NodeAttrs.LABEL, "n" + (id++));
-					if(node.isConfluence()) {
+					if (node.isConfluence()) {
 						properties.put(NodeAttrs.SHAPE, NodeShapes.OCTAGON);
 					}
 					return true;
 				}
-				
+
 			};
 		}
-		
+
 	}
-	
+
 	public class AutomatonView implements MealyTransitionSystem<State, I, TransitionRecord, O> {
 		@Override
 		public State getSuccessor(TransitionRecord transition) {
 			State src = transition.source;
 			return src.getSuccessor(transition.transIdx);
 		}
+
 		@Override
 		public State getInitialState() {
 			return init;
 		}
+
 		@Override
 		public TransitionRecord getTransition(State state, I input) {
 			int inputIdx = inputAlphabet.getSymbolIndex(input);
-			if(state.getSuccessor(inputIdx) == null) {
+			if (state.getSuccessor(inputIdx) == null) {
 				return null;
 			}
-			return new TransitionRecord(state, inputIdx); 
+			return new TransitionRecord(state, inputIdx);
 		}
+
 		@Override
 		@SuppressWarnings("unchecked")
 		public O getTransitionOutput(TransitionRecord transition) {
 			State src = transition.source;
-			return (O)src.getOutput(transition.transIdx);
+			return (O) src.getOutput(transition.transIdx);
 		}
 	}
-	
-	
-	
+
 	private final Map<StateSignature, State> register = new HashMap<>();
 
 	private final int alphabetSize;
@@ -209,8 +217,7 @@ public class IncrementalMealyDAGBuilder<I, O> extends
 		State s = getState(word);
 		return (s != null);
 	}
-	
-	
+
 	/**
 	 * Retrieves the output word for the given input word. If no definitive
 	 * information for the input word exists, the output for the longest known
@@ -281,19 +288,12 @@ public class IncrementalMealyDAGBuilder<I, O> extends
 			// conflict
 			O outSym = outWordIterator.next();
 			if (!Objects.equals(outSym, curr.getOutput(idx))) {
-				System.out.println("Error inserting "
-						+ word + "\nDISCREPENCY AFTER: "
-						+ word.prefix(path.size() + 1) + " / "
-						+ outputWord.prefix(path.size() + 1)
-						+ ": Incompatible output symbols: " + outSym + " vs model "
-						+ curr.getOutput(idx));
-				log.log(Level.INFO, "Error inserting "
-						+ word + "\nDISCREPENCY AFTER: "
-						+ word.prefix(path.size() + 1) + " / "
-						+ outputWord.prefix(path.size() + 1)
-						+ ": Incompatible output symbols: " + outSym + " vs model "
-						+ curr.getOutput(idx));
-				throw new ConflictException(word.prefix(path.size() + 1).toString());
+				log.log(Level.INFO,
+						"Error inserting " + word + "\nDISCREPENCY AFTER: " + word.prefix(path.size() + 1) + " / "
+								+ outputWord.prefix(path.size() + 1) + ": Incompatible output symbols: " + outSym
+								+ " vs model " + curr.getOutput(idx));
+				throw new ConflictException(
+						word.prefix(path.size() + 1).toString() + " / " + outputWord.prefix(path.size() + 1));
 			}
 			path.push(new PathElem(curr, idx));
 			curr = succ;
@@ -331,8 +331,7 @@ public class IncrementalMealyDAGBuilder<I, O> extends
 		int suffTransIdx = inputAlphabet.getSymbolIndex(sym);
 		O suffTransOut = suffixOut.firstSymbol();
 
-		State suffixState = createSuffix(suffix.subWord(1),
-				suffixOut.subWord(1));
+		State suffixState = createSuffix(suffix.subWord(1), suffixOut.subWord(1));
 
 		if (last != init) {
 			last = unhide(last, suffTransIdx, suffixState, suffTransOut);
@@ -379,9 +378,9 @@ public class IncrementalMealyDAGBuilder<I, O> extends
 	}
 
 	/**
-	 * Update the signature of the initial state. This requires special
-	 * handling, as the initial state is not stored in the register (since it
-	 * can never legally act as a predecessor).
+	 * Update the signature of the initial state. This requires special handling, as
+	 * the initial state is not stored in the register (since it can never legally
+	 * act as a predecessor).
 	 * 
 	 * @param idx
 	 *            the transition index being changed
@@ -409,9 +408,9 @@ public class IncrementalMealyDAGBuilder<I, O> extends
 	 *            the transition index to modify
 	 * @param succ
 	 *            the new successor state
-	 * @return the resulting state, which can either be the same as the input
-	 *         state (if the new signature is unique), or the result of merging
-	 *         with another state.
+	 * @return the resulting state, which can either be the same as the input state
+	 *         (if the new signature is unique), or the result of merging with
+	 *         another state.
 	 */
 	private State updateSignature(State state, int idx, State succ) {
 		StateSignature sig = state.getSignature();
@@ -443,8 +442,8 @@ public class IncrementalMealyDAGBuilder<I, O> extends
 	}
 
 	/**
-	 * Updates the signature of the initial state, changing both the successor
-	 * state and the output symbol.
+	 * Updates the signature of the initial state, changing both the successor state
+	 * and the output symbol.
 	 * 
 	 * @param idx
 	 *            the transition index to change
@@ -548,12 +547,12 @@ public class IncrementalMealyDAGBuilder<I, O> extends
 
 		return last;
 	}
-	
+
 	@Override
 	public GraphView asGraph() {
 		return new GraphView();
 	}
-	
+
 	@Override
 	public AutomatonView asTransitionSystem() {
 		return new AutomatonView();
@@ -561,11 +560,14 @@ public class IncrementalMealyDAGBuilder<I, O> extends
 
 	/*
 	 * (non-Javadoc)
-	 * @see net.automatalib.incremental.IncrementalConstruction#findSeparatingWord(java.lang.Object, java.util.Collection, boolean)
+	 * 
+	 * @see
+	 * net.automatalib.incremental.IncrementalConstruction#findSeparatingWord(java.
+	 * lang.Object, java.util.Collection, boolean)
 	 */
 	@Override
-	public Word<I> findSeparatingWord(MealyMachine<?, I, ?, O> target,
-			Collection<? extends I> inputs, boolean omitUndefined) {
+	public Word<I> findSeparatingWord(MealyMachine<?, I, ?, O> target, Collection<? extends I> inputs,
+			boolean omitUndefined) {
 		return doFindSeparatingWord(target, inputs, omitUndefined);
 	}
 
@@ -589,8 +591,7 @@ public class IncrementalMealyDAGBuilder<I, O> extends
 		private final Record<S, I> reachedFrom;
 		private final int depth;
 
-		public Record(State state1, S state2, Record<S, I> reachedFrom,
-				I reachedVia) {
+		public Record(State state1, S state2, Record<S, I> reachedFrom, I reachedVia) {
 			this.state1 = state1;
 			this.state2 = state2;
 			this.reachedFrom = reachedFrom;
@@ -603,8 +604,8 @@ public class IncrementalMealyDAGBuilder<I, O> extends
 		}
 	}
 
-	private <S, T> Word<I> doFindSeparatingWord(MealyMachine<S, I, T, O> mealy,
-			Collection<? extends I> inputs, boolean omitUndefined) {
+	private <S, T> Word<I> doFindSeparatingWord(MealyMachine<S, I, T, O> mealy, Collection<? extends I> inputs,
+			boolean omitUndefined) {
 		int thisStates = register.size();
 
 		UnionFind uf = new UnionFind(thisStates + mealy.size());
@@ -615,12 +616,11 @@ public class IncrementalMealyDAGBuilder<I, O> extends
 		S init2 = mealy.getInitialState();
 
 		if (init2 == null)
-			return omitUndefined ? null : Word.<I> epsilon();
+			return omitUndefined ? null : Word.<I>epsilon();
 
 		StateIDs<S> mealyIds = mealy.stateIDs();
 
-		int id1 = getStateId(init1, ids), id2 = mealyIds.getStateId(init2)
-				+ thisStates;
+		int id1 = getStateId(init1, ids), id2 = mealyIds.getStateId(init2) + thisStates;
 
 		uf.link(id1, id2);
 
