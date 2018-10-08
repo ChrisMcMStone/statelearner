@@ -19,7 +19,9 @@ package nl.cypherpunk.statelearner;
 import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.logging.Level;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 
@@ -35,24 +37,34 @@ import de.learnlib.logging.LearnLogger;
 @ParametersAreNonnullByDefault
 public class LogOracle<I, D> implements MealyMembershipOracle<I, D> {
 	public static class MealyLogOracle<I, O> extends LogOracle<I, O> {
-		public MealyLogOracle(SUL<I, O> sul, LearnLogger logger, Connection dbConn) {
-			super(sul, logger, dbConn);
+		public MealyLogOracle(SUL<I, O> sul, LearnLogger logger, LearningConfig config) {
+			super(sul, logger, config);
 		}
 	}
 
 	LearnLogger logger;
 	SUL<I, D> sul;
 	Connection dbConn;
+	ArrayList<ArrayList<String[]>> expected_flows;
+	boolean use_cache = false;
 
-	public LogOracle(SUL<I, D> sul, LearnLogger logger, Connection dbConn) {
+	public LogOracle(SUL<I, D> sul, LearnLogger logger, LearningConfig config) {
 		this.sul = sul;
 		this.logger = logger;
-		this.dbConn = dbConn;
+		if (config.use_cache) {
+			this.expected_flows = config.expected_flows;
+			this.dbConn = config.dbConn;
+			this.use_cache = true;
+		}
 	}
 
 	@Override
 	public Word<D> answerQuery(Word<I> prefix, Word<I> suffix) {
-		return answerQuery(prefix, suffix, true);
+		if (use_cache) {
+			return answerQuery(prefix, suffix, true);
+		} else {
+			return answerQuery(prefix, suffix, false);
+		}
 	}
 
 	@Override
@@ -60,7 +72,7 @@ public class LogOracle<I, D> implements MealyMembershipOracle<I, D> {
 	public Word<D> answerQuery(Word<I> query) {
 		return answerQuery((Word<I>) Word.epsilon(), query);
 	}
-	
+
 	@Override
 	public MembershipOracle<I, Word<D>> asOracle() {
 		return this;
@@ -91,22 +103,52 @@ public class LogOracle<I, D> implements MealyMembershipOracle<I, D> {
 		try {
 			// Prefix: Execute symbols, only log output
 			WordBuilder<D> wbPrefix = new WordBuilder<>(prefix.length());
+			WordBuilder<D> wbPrefixNoTime = new WordBuilder<>(prefix.length());
 			for (I sym : prefix) {
+				D res = this.sul.step(sym);
 				wbPrefix.add(this.sul.step(sym));
+				wbPrefixNoTime.add((D)Utils.stripTimestamp((String)res));
 			}
 
 			// Suffix: Execute symbols, outputs constitute output word
 			WordBuilder<D> wbSuffix = new WordBuilder<>(suffix.length());
+			WordBuilder<D> wbSuffixNoTime = new WordBuilder<>(prefix.length());
 			for (I sym : suffix) {
+				D res = this.sul.step(sym);
 				wbSuffix.add(this.sul.step(sym));
+				wbSuffixNoTime.add((D)Utils.stripTimestamp((String)res));
 			}
 
 			logger.logQuery("[" + prefix.toString() + " | " + suffix.toString() + " / " + wbPrefix.toWord().toString()
 					+ " | " + wbSuffix.toWord().toString() + "]");
 
 			Word<D> response = wbPrefix.toWord().concat(wbSuffix.toWord());
+			Word<D> responseNoTime = wbPrefixNoTime.toWord().concat(wbSuffixNoTime.toWord());
 
-			Utils.cacheQueryResponse(query, response, dbConn);
+			// Check expected flows are compatible excluding timestamps
+			for (ArrayList<String[]> flow : expected_flows) {
+				boolean verify = true;
+				for (int i = 0; i < flow.size(); i++) {
+					String[] qr = flow.get(i);
+					if (!qr[0].equals(query.getSymbol(i).toString())) {
+						verify = false;
+						break;
+					}
+				}
+				if (verify) {
+					for (int i = 0; i < flow.size(); i++) {
+						String[] qr = flow.get(i);
+						if (!qr[1].equals(responseNoTime.getSymbol(i).toString())) {
+							// retry
+							logger.log(Level.INFO, "Expected Flow Inconsistency, retrying.");
+							return answerQuery(prefix, suffix, cache);
+						}
+					}
+				}
+			}
+
+			if (cache)
+				Utils.cacheQueryResponse(query, response, dbConn);
 
 			return wbSuffix.toWord();
 		} finally {

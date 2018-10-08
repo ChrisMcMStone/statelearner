@@ -151,5 +151,10 @@ public class Utils {
 		}
 		return -1;
 	}
+	
+	public static String stripTimestamp(String word) {
+		int i = word.indexOf(",");
+		return word.substring(0, i);
+	}
 
 }
