@@ -140,7 +140,7 @@ public class Learner {
 		// statsMemOracle = new MealyCounterOracle<String, String>(logMemOracle,
 		// "membership queries to SUL");
 		// Use cache oracle to prevent double queries to the SUL
-		cachedMemOracle = MealyCacheOracle.createDAGCacheOracle(alphabet, null, logMemOracle, config.dbConn);
+		cachedMemOracle = MealyCacheOracle.createDAGCacheOracle(alphabet, null, logMemOracle, config.getDbConn());
 		// Count the number of queries to the cache
 		statsCachedMemOracle = new MealyCounterOracle<String, String>(cachedMemOracle, "membership queries to cache");
 

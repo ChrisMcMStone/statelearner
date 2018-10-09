@@ -53,7 +53,10 @@ public class LearningConfig {
 	boolean use_cache = false;
 	ArrayList<ArrayList<String[]>> expected_flows;
 	Connection dbConn;
-
+	
+	// Efficient time learning
+	boolean time_learn = false;
+	
 	// Used for W-Method and Wp-method
 	int max_depth = 10;
 
@@ -70,7 +73,7 @@ public class LearningConfig {
 		properties.load(input);
 
 		loadProperties();
-		if (use_cache) {
+		if (use_cache || time_learn) {
 			try {
 				setUpdDBConn();
 			} catch (Exception e) {
@@ -134,6 +137,9 @@ public class LearningConfig {
 
 		if (properties.getProperty("use_cache") != null)
 			use_cache = true;
+		
+		if (properties.getProperty("time_learn") != null)
+			time_learn = true;
 
 		if (properties.getProperty("expected_flows") != null)
 			parseFlows(properties.getProperty("expected_flows"));
@@ -181,14 +187,22 @@ public class LearningConfig {
 	private void setUpdDBConn() throws Exception {
 		LearnLogger log = LearnLogger.getLogger(Learner.class.getSimpleName());
 		Class.forName("org.sqlite.JDBC");
-		this.dbConn = DriverManager.getConnection("jdbc:sqlite:cache.db");
+		this.setDbConn(DriverManager.getConnection("jdbc:sqlite:cache.db"));
 		Statement stmt = null;
-		stmt = dbConn.createStatement();
+		stmt = getDbConn().createStatement();
 		String sql = "CREATE TABLE IF NOT EXISTS CACHE" + "(ID INTEGER PRIMARY KEY, PREFIX_ID TEXT NOT NULL,"
 				+ "RESPONSE	TEXT	NOT NULL,  COUNT INT DEFAULT 0, CONSTRAINT xyz UNIQUE (PREFIX_ID, RESPONSE))";
 		stmt.executeUpdate(sql);
 		stmt.close();
 		log.log(Level.INFO, "Successfully set up caching database");
+	}
+
+	public Connection getDbConn() {
+		return dbConn;
+	}
+
+	public void setDbConn(Connection dbConn) {
+		this.dbConn = dbConn;
 	}
 
 }

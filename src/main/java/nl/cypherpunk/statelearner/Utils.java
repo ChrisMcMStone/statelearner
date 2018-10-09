@@ -154,6 +154,8 @@ public class Utils {
 	
 	public static String stripTimestamp(String word) {
 		int i = word.indexOf(",");
+		if(i == -1)
+			return word;
 		return word.substring(0, i);
 	}
 

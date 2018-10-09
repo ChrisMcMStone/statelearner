@@ -27,6 +27,7 @@ import javax.annotation.ParametersAreNonnullByDefault;
 
 import net.automatalib.words.Word;
 import net.automatalib.words.WordBuilder;
+import nl.cyperpunk.learningpurpose.LearningPurpose;
 import de.learnlib.api.MembershipOracle;
 import de.learnlib.api.MembershipOracle.MealyMembershipOracle;
 import de.learnlib.api.Query;
@@ -47,14 +48,22 @@ public class LogOracle<I, D> implements MealyMembershipOracle<I, D> {
 	Connection dbConn;
 	ArrayList<ArrayList<String[]>> expected_flows;
 	boolean use_cache = false;
+	boolean time_learn = false;
+	LearningPurpose lp;
+	static String DISABLE_OUTPUT = "-";
 
 	public LogOracle(SUL<I, D> sul, LearnLogger logger, LearningConfig config) {
 		this.sul = sul;
 		this.logger = logger;
+		if (config.use_cache || config.time_learn)
+			this.dbConn = config.getDbConn();
 		if (config.use_cache) {
 			this.expected_flows = config.expected_flows;
-			this.dbConn = config.dbConn;
 			this.use_cache = true;
+		}
+		if (config.time_learn) {
+			this.time_learn = true;
+			this.lp = new LearningPurpose(config);
 		}
 	}
 
@@ -86,10 +95,10 @@ public class LogOracle<I, D> implements MealyMembershipOracle<I, D> {
 		}
 	}
 
-	public Word<D> answerQuery(Word<I> prefix, Word<I> suffix, boolean cache) {
+	public Word<D> answerQuery(Word<I> prefix, Word<I> suffix, boolean cacheLookup) {
 
 		Word<I> query = prefix.concat(suffix);
-		if (cache) {
+		if (cacheLookup) {
 			Word<D> dbresponse = Utils.cacheLookupQuery(query.toString(), suffix.size(), dbConn);
 			if (dbresponse != null) {
 				logger.logQuery(
@@ -98,6 +107,7 @@ public class LogOracle<I, D> implements MealyMembershipOracle<I, D> {
 			}
 		}
 
+		if(time_learn) this.lp.reset();
 		this.sul.pre();
 
 		try {
@@ -105,18 +115,38 @@ public class LogOracle<I, D> implements MealyMembershipOracle<I, D> {
 			WordBuilder<D> wbPrefix = new WordBuilder<>(prefix.length());
 			WordBuilder<D> wbPrefixNoTime = new WordBuilder<>(prefix.length());
 			for (I sym : prefix) {
-				D res = this.sul.step(sym);
-				wbPrefix.add(this.sul.step(sym));
-				wbPrefixNoTime.add((D)Utils.stripTimestamp((String)res));
+				D res;
+				if(time_learn) {
+					if(lp.run((String)sym)) {
+						res = this.sul.step(sym);
+						lp.run((String)res);
+					} else {
+						res = (D)DISABLE_OUTPUT;
+					}
+				} else {
+						res = this.sul.step(sym);
+				}
+				wbPrefix.add(res);
+				wbPrefixNoTime.add((D) Utils.stripTimestamp((String) res));
 			}
 
 			// Suffix: Execute symbols, outputs constitute output word
 			WordBuilder<D> wbSuffix = new WordBuilder<>(suffix.length());
 			WordBuilder<D> wbSuffixNoTime = new WordBuilder<>(prefix.length());
 			for (I sym : suffix) {
-				D res = this.sul.step(sym);
-				wbSuffix.add(this.sul.step(sym));
-				wbSuffixNoTime.add((D)Utils.stripTimestamp((String)res));
+				D res;
+				if(time_learn) {
+					if(lp.run((String)sym)) {
+						res = this.sul.step(sym);
+						lp.run((String)res);
+					} else {
+						res = (D)DISABLE_OUTPUT;
+					}
+				} else {
+						res = this.sul.step(sym);
+				}
+				wbSuffix.add(res);
+				wbSuffixNoTime.add((D) Utils.stripTimestamp((String) res));
 			}
 
 			logger.logQuery("[" + prefix.toString() + " | " + suffix.toString() + " / " + wbPrefix.toWord().toString()
@@ -143,13 +173,13 @@ public class LogOracle<I, D> implements MealyMembershipOracle<I, D> {
 						if (!qr[1].equals(responseNoTime.getSymbol(i).toString())) {
 							// retry
 							logger.log(Level.INFO, "Expected Flow Inconsistency, retrying.");
-							return answerQuery(prefix, suffix, cache);
+							return answerQuery(prefix, suffix, cacheLookup);
 						}
 					}
 				}
 			}
 
-			if (cache)
+			if (use_cache)
 				Utils.cacheQueryResponse(query, response, dbConn);
 
 			return wbSuffix.toWord();
