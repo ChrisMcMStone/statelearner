@@ -128,6 +128,7 @@ public class LogOracle<I, D> implements MealyMembershipOracle<I, D> {
 			// Check expected flows are compatible excluding timestamps
 			for (ArrayList<String[]> flow : expected_flows) {
 				boolean verify = true;
+				// Check whether query prefix matches flow
 				for (int i = 0; i < flow.size(); i++) {
 					String[] qr = flow.get(i);
 					if (!qr[0].equals(query.getSymbol(i).toString())) {
@@ -136,6 +137,7 @@ public class LogOracle<I, D> implements MealyMembershipOracle<I, D> {
 					}
 				}
 				if (verify) {
+					// If it does match, check outputs are consistent
 					for (int i = 0; i < flow.size(); i++) {
 						String[] qr = flow.get(i);
 						if (!qr[1].equals(responseNoTime.getSymbol(i).toString())) {
