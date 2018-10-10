@@ -12,18 +12,16 @@ public class LearningPurpose {
 	private int state = 0;
 	private static String DISABLE_SYM = "-";
 	private String last_message = "";
-	private ArrayList<String> resetOutputs = new ArrayList<>();
-	private ArrayList<String> postRetransInputs = new ArrayList<>();
+	private ArrayList<String> resetOutputs;
+	private ArrayList<String> postRetransInputs;
 
 	public LearningPurpose(LearningConfig config) {
 		this.dbConn = config.getDbConn();
 		
-		//TODO extract these from config file
 		//Reset/Disable outputs
-		this.resetOutputs.add("Deauth");
-		this.resetOutputs.add("TIMEOUT");
+		this.resetOutputs = config.getDisable_outputs();
 		//Inputs enabled after a retransmission observed
-		this.postRetransInputs.add("DELAY");
+		this.postRetransInputs = config.getRetrans_enabled();
 	}
 
 	public boolean run(String sym) {

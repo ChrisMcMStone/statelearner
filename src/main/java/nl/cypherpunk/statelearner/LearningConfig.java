@@ -23,6 +23,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Properties;
 import java.util.logging.Level;
 
@@ -56,7 +57,9 @@ public class LearningConfig {
 	
 	// Efficient time learning
 	boolean time_learn = false;
-	
+	ArrayList<String> disable_outputs = new ArrayList<>();
+	ArrayList<String> retrans_enabled = new ArrayList<>();
+
 	// Used for W-Method and Wp-method
 	int max_depth = 10;
 
@@ -143,6 +146,13 @@ public class LearningConfig {
 
 		if (properties.getProperty("expected_flows") != null)
 			parseFlows(properties.getProperty("expected_flows"));
+		
+		if (properties.getProperty("disable_outputs") != null)
+			disable_outputs.addAll(Arrays.asList(properties.getProperty("disable_outputs").split(" ")));
+		
+		if (properties.getProperty("retrans_enabled") != null)
+			retrans_enabled.addAll(Arrays.asList(properties.getProperty("retrans_enabled").split(" ")));
+		
 	}
 
 	private void parseFlows(String p) {
@@ -205,4 +215,11 @@ public class LearningConfig {
 		this.dbConn = dbConn;
 	}
 
+	public ArrayList<String> getDisable_outputs() {
+		return disable_outputs;
+	}
+	
+	public ArrayList<String> getRetrans_enabled() {
+		return retrans_enabled;
+	}
 }
