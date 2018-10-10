@@ -201,7 +201,7 @@ public class LearningConfig {
 		Statement stmt = null;
 		stmt = getDbConn().createStatement();
 		String sql = "CREATE TABLE IF NOT EXISTS CACHE" + "(ID INTEGER PRIMARY KEY, PREFIX_ID TEXT NOT NULL,"
-				+ "RESPONSE	TEXT	NOT NULL,  COUNT INT DEFAULT 0, CONSTRAINT xyz UNIQUE (PREFIX_ID, RESPONSE))";
+				+ "RESPONSE	TEXT	NOT NULL,  COUNT INT DEFAULT 0, IS_OPTIMISED INT DEFAULT 0, CONSTRAINT xyz UNIQUE (PREFIX_ID, RESPONSE))";
 		stmt.executeUpdate(sql);
 		stmt.close();
 		log.log(Level.INFO, "Successfully set up caching database");

@@ -390,6 +390,7 @@ public class Learner {
 					learner.learn();
 				} catch (ConflictException e) {
 					// Note, currently if conflict occurs, logs and timers will be overwritten.
+					// TODO learning state may need to be extracted from database cache as a result
 					learner.resetLearner();
 				}
 			}

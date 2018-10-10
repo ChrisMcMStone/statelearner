@@ -27,7 +27,7 @@ import javax.annotation.ParametersAreNonnullByDefault;
 
 import net.automatalib.words.Word;
 import net.automatalib.words.WordBuilder;
-import nl.cyperpunk.learningpurpose.LearningPurpose;
+import nl.cypherpunk.learningpurpose.LearningPurpose;
 import de.learnlib.api.MembershipOracle;
 import de.learnlib.api.MembershipOracle.MealyMembershipOracle;
 import de.learnlib.api.Query;
