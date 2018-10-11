@@ -30,6 +30,7 @@ import java.util.logging.Level;
 import org.apache.commons.lang3.StringUtils;
 
 import de.learnlib.logging.LearnLogger;
+import net.automatalib.words.impl.SimpleAlphabet;
 
 /**
  * Configuration class used for learning parameters
@@ -54,6 +55,8 @@ public class LearningConfig {
 	boolean use_cache = false;
 	ArrayList<ArrayList<String[]>> expected_flows;
 	Connection dbConn;
+	
+	SimpleAlphabet<String> alphabet;
 	
 	// Efficient time learning
 	boolean time_learn = false;
@@ -222,4 +225,13 @@ public class LearningConfig {
 	public ArrayList<String> getRetrans_enabled() {
 		return retrans_enabled;
 	}
+	
+	public SimpleAlphabet<String> getAlphabet() {
+		return alphabet;
+	}
+
+	public void setAlphabet(SimpleAlphabet<String> alphabet) {
+		this.alphabet = alphabet;
+	}
+
 }

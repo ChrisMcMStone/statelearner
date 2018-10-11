@@ -5,7 +5,9 @@ import java.util.ArrayList;
 
 import net.automatalib.words.Word;
 import net.automatalib.words.WordBuilder;
+import net.automatalib.words.impl.SimpleAlphabet;
 import nl.cypherpunk.statelearner.LearningConfig;
+import nl.cypherpunk.statelearner.LogOracle;
 import nl.cypherpunk.statelearner.Utils;
 
 public class LearningPurpose {
@@ -19,6 +21,7 @@ public class LearningPurpose {
 	private int queryIndex = 0;
 	private WordBuilder<String> query;
 	private WordBuilder<String> response;
+	private SimpleAlphabet<String> alphabet;
 
 	public LearningPurpose(LearningConfig config) {
 		this.dbConn = config.getDbConn();
@@ -29,6 +32,7 @@ public class LearningPurpose {
 		this.postRetransInputs = config.getRetrans_enabled();
 		this.query = new WordBuilder<>();
 		this.response = new WordBuilder<>();
+		this.alphabet = config.getAlphabet();
 	}
 
 	public boolean run(String sym) {
@@ -55,6 +59,7 @@ public class LearningPurpose {
 		this.queryIndex = 0;
 		this.response.clear();
 		this.query.clear();
+		this.last_message = "";
 	}
 
 	/*
@@ -70,12 +75,14 @@ public class LearningPurpose {
 		if(Utils.stripTimestamp(output).equals(this.last_message)) {
 			this.state=2;
 			//TODO add cache update optimization
+			optimise();
 			
 		} else if(resetOutputs.contains(Utils.stripTimestamp(output))) {
 			this.state = -1;
 		} else {
 			this.state = 0;
 		}
+		this.last_message = Utils.stripTimestamp(output);
 	}
 
 	private void state2(String input) {
@@ -85,6 +92,20 @@ public class LearningPurpose {
 		} else {
 			this.state = -1;
 		}
+	}
+	
+	private void optimise() {
+		for(String s : this.alphabet) {
+			if(!this.postRetransInputs.contains(s)) {
+				String q = this.query.toWord().toString() + " " + s;
+				String r = this.response.toWord().toString() + " " + LogOracle.DISABLE_OUTPUT;
+				Utils.cacheStringQueryResponse(q, r, dbConn, true);
+			}
+		}
+		// For each x : alphabet
+		// if x is not in postRetransInputs
+		// Add to db, query = this.query.toWord().toString  + x, response = this.response.toWord + logOracle.disableOutput
+		// Add query to blacklist
 	}
 
 }

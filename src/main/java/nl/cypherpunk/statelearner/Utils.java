@@ -60,27 +60,7 @@ public class Utils {
 		for (int i = 1; i < response.length() + 1; i++) {
 			Word subPref = query.prefix(i);
 			Word subResp = response.prefix(i);
-			Statement stmt = null;
-			try {
-				stmt = dbConn.createStatement();
-				stmt.executeUpdate(
-						"INSERT INTO CACHE (PREFIX_ID, RESPONSE) " + "VALUES ('" + subPref + "', '" + subResp + "');");
-				stmt.executeUpdate("UPDATE CACHE SET COUNT = COUNT + 1 WHERE PREFIX_ID = '" + subPref.toString()
-						+ "' AND RESPONSE = '" + subResp + "'");
-				stmt.close();
-			} catch (Exception e) {
-				if (e.getMessage().contains("UNIQUE")) {
-					try {
-						stmt.executeUpdate("UPDATE CACHE SET COUNT = COUNT + 1 WHERE PREFIX_ID = '" + subPref.toString()
-								+ "' AND RESPONSE = '" + subResp + "'");
-						stmt.close();
-					} catch (Exception e2) {
-						System.err.println(e2.getClass().getName() + ": " + e2.getMessage());
-					}
-				} else {
-					System.err.println(e.getClass().getName() + ": " + e.getMessage());
-				}
-			}
+			cacheStringQueryResponse(subPref.toString(), subResp.toString(), dbConn, false);
 		}
 	}
 
@@ -139,7 +119,8 @@ public class Utils {
 			inconsistentPrefix = inconsistentPrefix.substring(2);
 		try {
 			stmt = dbConn.createStatement();
-			String qry = "DELETE FROM CACHE WHERE PREFIX_ID LIKE '" + inconsistentPrefix + "%' AND RESPONSE NOT LIKE '"+inconsistentResponse+"%'";
+			String qry = "DELETE FROM CACHE WHERE PREFIX_ID LIKE '" + inconsistentPrefix + "%' AND RESPONSE NOT LIKE '"
+					+ inconsistentResponse + "%'";
 			return stmt.executeUpdate(qry);
 		} catch (Exception e) {
 			System.err.println(e.getClass().getName() + ": " + e.getMessage());
@@ -151,12 +132,40 @@ public class Utils {
 		}
 		return -1;
 	}
-	
+
 	public static String stripTimestamp(String word) {
 		int i = word.indexOf(",");
-		if(i == -1)
+		if (i == -1)
 			return word;
 		return word.substring(0, i);
 	}
 
+	/*
+	 * Cache the query and response (including constituent sub queries and
+	 * responses) and update observation counters.
+	 */
+	public static void cacheStringQueryResponse(String query, String response, Connection dbConn, boolean isOptimsed) {
+		//TODO set is_optimised flag in db cache
+		Statement stmt = null;
+		try {
+			stmt = dbConn.createStatement();
+			stmt.executeUpdate(
+					"INSERT INTO CACHE (PREFIX_ID, RESPONSE, IS_OPTIMISED) " + "VALUES ('" + query + "', '" + response + "', " + (isOptimsed ? 1 : 0)+")");
+				stmt.executeUpdate("UPDATE CACHE SET COUNT = COUNT + 1 WHERE PREFIX_ID = '" + query.toString()
+						+ "' AND RESPONSE = '" + response + "'");
+			stmt.close();
+		} catch (Exception e) {
+			if (e.getMessage().contains("UNIQUE")) {
+				try {
+					stmt.executeUpdate("UPDATE CACHE SET COUNT = COUNT + 1 WHERE PREFIX_ID = '" + query
+							+ "' AND RESPONSE = '" + response + "'");
+					stmt.close();
+				} catch (Exception e2) {
+					System.err.println(e2.getClass().getName() + ": " + e2.getMessage());
+				}
+			} else {
+				System.err.println(e.getClass().getName() + ": " + e.getMessage());
+			}
+		}
+	}
 }

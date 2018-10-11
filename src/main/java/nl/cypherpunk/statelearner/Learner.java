@@ -125,6 +125,7 @@ public class Learner {
 			sul = new TLSSUL(new TLSConfig(config));
 			alphabet = ((TLSSUL) sul).getAlphabet();
 		}
+		config.setAlphabet(alphabet);
 
 		loadLearningAlgorithm(config.learning_algorithm, alphabet, sul);
 		loadEquivalenceAlgorithm(config.eqtest, alphabet, sul);

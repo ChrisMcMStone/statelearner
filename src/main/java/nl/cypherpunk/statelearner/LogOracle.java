@@ -50,7 +50,7 @@ public class LogOracle<I, D> implements MealyMembershipOracle<I, D> {
 	boolean use_cache = false;
 	boolean time_learn = false;
 	LearningPurpose lp;
-	static String DISABLE_OUTPUT = "-";
+	public static String DISABLE_OUTPUT = "-";
 
 	public LogOracle(SUL<I, D> sul, LearnLogger logger, LearningConfig config) {
 		this.sul = sul;
