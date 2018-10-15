@@ -90,7 +90,7 @@ public class Utils {
 				String x = rs.getString("RESPONSE");
 				String[] splitStr = x.trim().split("\\s+");
 				try {
-					if (suffixSize == 0) {
+					if (suffixSize == 0 || suffixSize == splitStr.length) {
 						Word response = Word.fromArray(splitStr, 0, splitStr.length);
 						return response;
 					} else {
@@ -99,23 +99,25 @@ public class Utils {
 					}
 				} catch (Exception e) {
 					System.err.println(e.getClass().getName() + ": " + e.getMessage());
+					e.printStackTrace();
 				}
 			}
 		} catch (Exception e) {
 			System.err.println(e.getClass().getName() + ": " + e.getMessage());
+			e.printStackTrace();
 		} finally {
 			try {
 				rs.close();
 				stmt.close();
 			} catch (Exception e) {
 				System.err.println(e.getClass().getName() + ": " + e.getMessage());
+				e.printStackTrace();
 			}
 		}
 		return null;
 	}
 
 	public static int correctDBcache(String inconsistentPrefix, String inconsistentResponse, Connection dbConn) {
-		// TODO Auto-generated method stub
 		Statement stmt = null;
 		if (inconsistentPrefix.substring(0, 1).equals("ε"))
 			inconsistentPrefix = inconsistentPrefix.substring(2);
@@ -126,6 +128,7 @@ public class Utils {
 			return stmt.executeUpdate(qry);
 		} catch (Exception e) {
 			System.err.println(e.getClass().getName() + ": " + e.getMessage());
+			e.printStackTrace();
 		} finally {
 			try {
 				stmt.close();
@@ -148,35 +151,42 @@ public class Utils {
 	 */
 	public static void cacheStringQueryResponse(String query, String response, Connection dbConn, boolean isOptimsed) {
 		// TODO maybe remove count increase if is_optimised
+		if(StringUtils.countMatches(query, " ")!= StringUtils.countMatches(response, " "))
+			System.out.println("THIS SHOULD NOT HAPPEN");
 		Statement stmt = null;
 		try {
 			stmt = dbConn.createStatement();
 			stmt.executeUpdate("INSERT INTO CACHE (PREFIX_ID, RESPONSE, IS_OPTIMISED) " + "VALUES ('" + query + "', '"
 					+ response + "', " + (isOptimsed ? 1 : 0) + ")");
-			if(!isOptimsed) stmt.executeUpdate("UPDATE CACHE SET COUNT = COUNT + 1 WHERE PREFIX_ID = '" + query.toString()
-					+ "' AND RESPONSE = '" + response + "'");
+			if (!isOptimsed)
+				stmt.executeUpdate("UPDATE CACHE SET COUNT = COUNT + 1 WHERE PREFIX_ID = '" + query.toString()
+						+ "' AND RESPONSE = '" + response + "'");
 			stmt.close();
 		} catch (Exception e) {
 			if (e.getMessage().contains("UNIQUE")) {
 				try {
-					if(!isOptimsed) stmt.executeUpdate("UPDATE CACHE SET COUNT = COUNT + 1 WHERE PREFIX_ID = '" + query
-							+ "' AND RESPONSE = '" + response + "'");
+					if (!isOptimsed)
+						stmt.executeUpdate("UPDATE CACHE SET COUNT = COUNT + 1 WHERE PREFIX_ID = '" + query
+								+ "' AND RESPONSE = '" + response + "'");
 					stmt.close();
 				} catch (Exception e2) {
 					System.err.println(e2.getClass().getName() + ": " + e2.getMessage());
+					e.printStackTrace();
 				}
 			} else {
 				System.err.println(e.getClass().getName() + ": " + e.getMessage());
+				e.printStackTrace();
 			}
 		}
 	}
 
 	public static Word<String> responseIfDisabled(String query, Connection dbConn) {
 		// TODO Auto-generated method stub
-		
-		//Find the row with the largest prefix of query, with the greatest number of observations
-		//If it has a disable in it, then yes response is disabled. 
-		
+
+		// Find the row with the largest prefix of query, with the greatest number of
+		// observations
+		// If it has a disable in it, then yes response is disabled.
+
 		String[] splitQuery = query.split("\\s+");
 		StringBuilder sb = new StringBuilder();
 		String sql = "SELECT PREFIX_ID, RESPONSE FROM CACHE WHERE (";
@@ -187,7 +197,7 @@ public class Utils {
 		}
 		// Remove final " OR "
 		sql = sql.substring(0, sql.length() - 4);
-		//TODO Verify this ordering
+		// TODO Verify this ordering
 		sql = sql + ")  ORDER BY LENGTH(PREFIX_ID) DESC, COUNT DESC, ID ASC";
 		Statement stmt = null;
 		ResultSet rs = null;
@@ -197,11 +207,12 @@ public class Utils {
 			rs = stmt.executeQuery(sql);
 			if (rs.next()) {
 				String resp = rs.getString("RESPONSE");
-				if(!resp.contains(LogOracle.DISABLE_OUTPUT)) return null;
+				if (!resp.contains(LogOracle.DISABLE_OUTPUT))
+					return null;
 				int qi = StringUtils.countMatches(query, " ");
 				int ri = StringUtils.countMatches(resp, " ");
 				if (qi < ri) {
-					//TODO CHECK THIS
+					// TODO CHECK THIS
 					System.out.println("FUCKED IT");
 				} else {
 					for (int j = 0; j < qi - ri; j++) {
@@ -213,6 +224,7 @@ public class Utils {
 			}
 		} catch (Exception e) {
 			System.err.println(e.getClass().getName() + ": " + e.getMessage());
+			e.printStackTrace();
 			return null;
 		}
 		return null;

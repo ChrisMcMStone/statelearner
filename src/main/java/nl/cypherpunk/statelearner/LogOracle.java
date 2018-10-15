@@ -52,6 +52,7 @@ public class LogOracle<I, D> implements MealyMembershipOracle<I, D> {
 	boolean time_learn = false;
 	LearningPurpose lp;
 	public static String DISABLE_OUTPUT = "-";
+	boolean need_optimise = false;
 
 	public LogOracle(SUL<I, D> sul, LearnLogger logger, LearningConfig config) {
 		this.sul = sul;
@@ -97,6 +98,8 @@ public class LogOracle<I, D> implements MealyMembershipOracle<I, D> {
 	}
 
 	public Word<D> answerQuery(Word<I> prefix, Word<I> suffix, boolean cacheLookup) {
+		
+		need_optimise = false;
 
 		// Check if query has been already cached
 		Word<I> query = prefix.concat(suffix);
@@ -198,6 +201,7 @@ public class LogOracle<I, D> implements MealyMembershipOracle<I, D> {
 			if (use_cache)
 				Utils.cacheQueryResponse(query, response, dbConn);
 
+			need_optimise = true;
 			return wbSuffix.toWord();
 		} finally {
 			sul.post();
@@ -208,7 +212,7 @@ public class LogOracle<I, D> implements MealyMembershipOracle<I, D> {
 	 * Once query/response accepted by model, carry out optimizations
 	 */
 	public void lpPostProcess() {
-		lp.optimise();
+		if(need_optimise) lp.optimise();
 	}
 
 }

@@ -71,7 +71,8 @@ import nl.cypherpunk.statelearner.tls.TLSSUL;
 import nl.cypherpunk.statelearner.LogOracle.MealyLogOracle;
 
 /**
- * @author Joeri de Ruiter (joeri@cs.ru.nl)
+ * @author Joeri de Ruiter (joeri@cs.ru.nl) and Chris McMahon Stone
+ *         (c.mcmahon-stone@cs.bham.ac.uk
  */
 public class Learner {
 	LearningConfig config;
@@ -102,7 +103,6 @@ public class Learner {
 
 		configureLogging(config.output_dir);
 		LearnLogger log = LearnLogger.getLogger(Learner.class.getSimpleName());
-
 
 		// Check the type of learning we want to do and create corresponding
 		// configuration and SUL
@@ -187,13 +187,8 @@ public class Learner {
 		// eqOracle = new SULOracle<String, String>(sul);
 		// Add a logging oracle
 		logEqOracle = new MealyLogOracle<String, String>(sul, LearnLogger.getLogger("equivalence_queries"), config);
-		// Add an oracle that counts the number of queries
-		statsEqOracle = new MealyCounterOracle<String, String>(logEqOracle, "equivalence queries to SUL");
-		// Use cache oracle to prevent double queries to the SUL
-		// cachedEqOracle = MealyCacheOracle.createDAGCacheOracle(alphabet,
-		// statsEqOracle);
-		// Count the number of queries to the cache
-		statsCachedEqOracle = new MealyCounterOracle<String, String>(statsEqOracle, "equivalence queries to cache");
+		cachedEqOracle = MealyCacheOracle.createDAGCacheOracle(alphabet, null, logEqOracle, config.getDbConn());
+		statsCachedEqOracle = new MealyCounterOracle<String, String>(cachedEqOracle, "equivalence queries to cache");
 
 		// Instantiate the selected equivalence algorithm
 		switch (algorithm.toLowerCase()) {
@@ -220,6 +215,10 @@ public class Learner {
 		default:
 			throw new Exception("Unknown equivalence algorithm " + config.eqtest);
 		}
+	}
+	
+	public SUL<String, String> getSul() {
+		return sul;
 	}
 
 	public void learn() throws IOException, InterruptedException {
@@ -281,10 +280,10 @@ public class Learner {
 		log.log(Level.INFO, "-------------------------------------------------------");
 		log.log(Level.INFO, SimpleProfiler.getResults());
 		log.log(Level.INFO, round.getSummary());
-		log.log(Level.INFO, statsMemOracle.getStatisticalData().getSummary());
-		log.log(Level.INFO, statsCachedMemOracle.getStatisticalData().getSummary());
-		log.log(Level.INFO, statsEqOracle.getStatisticalData().getSummary());
-		log.log(Level.INFO, statsCachedEqOracle.getStatisticalData().getSummary());
+		// log.log(Level.INFO, statsMemOracle.getStatisticalData().getSummary());
+		// log.log(Level.INFO, statsCachedMemOracle.getStatisticalData().getSummary());
+		// log.log(Level.INFO, statsEqOracle.getStatisticalData().getSummary());
+		// log.log(Level.INFO, statsCachedEqOracle.getStatisticalData().getSummary());
 		log.log(Level.INFO, "States in final hypothesis: " + hypothesis.size());
 	}
 
@@ -381,6 +380,9 @@ public class Learner {
 		}
 		LearningConfig config = new LearningConfig(args[0]);
 		Learner learner = new Learner(config);
+		
+		//Tell the Learner to use the following timeout value
+		learner.getSul().step("TIMEOUT_MODIFY_" + config.getSmall_timeout());
 
 		if (!config.use_cache) {
 			learner.learn();
@@ -389,6 +391,9 @@ public class Learner {
 			while (true) {
 				try {
 					learner.learn();
+					//TODO delete all timeout entries in cache
+					// tell interface to use big timeout
+					// recover any learned counter examples to recover model with
 					System.exit(0);
 				} catch (ConflictException e) {
 					// Note, currently if conflict occurs, logs and timers will be overwritten.

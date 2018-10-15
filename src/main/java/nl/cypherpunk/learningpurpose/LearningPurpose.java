@@ -102,6 +102,8 @@ public class LearningPurpose {
 	}
 		
 	private void optimiseDisableState() {
+		if(query.size() != response.size())
+			return;
 		for(String s : this.alphabet) {
 				String q = this.query.toWord().toString() + " " + s;
 				String r = this.response.toWord().toString() + " " + LogOracle.DISABLE_OUTPUT;
@@ -110,7 +112,6 @@ public class LearningPurpose {
 	}
 	
 	public void optimise() {
-		
 		if(this.state == 2) {
 			optimiseState2();
 		} else if(this.state == -1) {

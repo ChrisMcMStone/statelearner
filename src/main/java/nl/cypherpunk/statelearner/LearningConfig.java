@@ -62,6 +62,8 @@ public class LearningConfig {
 	boolean time_learn = false;
 	ArrayList<String> disable_outputs = new ArrayList<>();
 	ArrayList<String> retrans_enabled = new ArrayList<>();
+	String small_timeout;
+	String big_timeout;
 
 	// Used for W-Method and Wp-method
 	int max_depth = 10;
@@ -156,6 +158,12 @@ public class LearningConfig {
 		if (properties.getProperty("retrans_enabled") != null)
 			retrans_enabled.addAll(Arrays.asList(properties.getProperty("retrans_enabled").split(" ")));
 		
+		if (properties.getProperty("small_timeout") != null)
+			small_timeout = properties.getProperty("small_timeout");
+		
+		if (properties.getProperty("big_timeout") != null)
+			big_timeout = properties.getProperty("big_timeout");
+		
 	}
 
 	private void parseFlows(String p) {
@@ -233,5 +241,14 @@ public class LearningConfig {
 	public void setAlphabet(SimpleAlphabet<String> alphabet) {
 		this.alphabet = alphabet;
 	}
+	
+	public String getSmall_timeout() {
+		return small_timeout;
+	}
+
+	public String getBig_timeout() {
+		return big_timeout;
+	}
+
 
 }
