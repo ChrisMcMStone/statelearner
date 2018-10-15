@@ -74,9 +74,6 @@ public class LearningPurpose {
 		this.response.append(output);
 		if(Utils.stripTimestamp(output).equals(this.last_message)) {
 			this.state=2;
-			//TODO add cache update optimization
-			optimise();
-			
 		} else if(resetOutputs.contains(Utils.stripTimestamp(output))) {
 			this.state = -1;
 		} else {
@@ -94,7 +91,7 @@ public class LearningPurpose {
 		}
 	}
 	
-	private void optimise() {
+	private void optimiseState2() {
 		for(String s : this.alphabet) {
 			if(!this.postRetransInputs.contains(s)) {
 				String q = this.query.toWord().toString() + " " + s;
@@ -102,10 +99,23 @@ public class LearningPurpose {
 				Utils.cacheStringQueryResponse(q, r, dbConn, true);
 			}
 		}
-		// For each x : alphabet
-		// if x is not in postRetransInputs
-		// Add to db, query = this.query.toWord().toString  + x, response = this.response.toWord + logOracle.disableOutput
-		// Add query to blacklist
+	}
+		
+	private void optimiseDisableState() {
+		for(String s : this.alphabet) {
+				String q = this.query.toWord().toString() + " " + s;
+				String r = this.response.toWord().toString() + " " + LogOracle.DISABLE_OUTPUT;
+				Utils.cacheStringQueryResponse(q, r, dbConn, true);
+			}
+	}
+	
+	public void optimise() {
+		
+		if(this.state == 2) {
+			optimiseState2();
+		} else if(this.state == -1) {
+			optimiseDisableState();
+		}
 	}
 
 }

@@ -183,11 +183,11 @@ public class MealyCacheOracle<I, O> implements MealyLearningCacheOracle<I, O> {
 			incMealyLock.unlock();
 		}
 
-		delegate.processQueries(masterQueries);
-
 		incMealyLock.lock();
 		try {
 			for (MasterQuery<I, O> m : masterQueries) {
+				Word<O> output = delegate.answerQuery(m.getPrefix(), m.getSuffix());
+				m.answer(output);
 				postProcess(m);
 			}
 		} finally {
@@ -203,6 +203,7 @@ public class MealyCacheOracle<I, O> implements MealyLearningCacheOracle<I, O> {
 		if (errorSyms == null) {
 			try {
 				incMealy.insert(input_suffix, answer);
+				delegate.lpPostProcess();
 			} catch (ConflictException e) {
 				// Assumes observation count already incremented.
 

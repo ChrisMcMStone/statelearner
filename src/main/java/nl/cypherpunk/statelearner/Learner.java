@@ -389,6 +389,7 @@ public class Learner {
 			while (true) {
 				try {
 					learner.learn();
+					System.exit(0);
 				} catch (ConflictException e) {
 					// Note, currently if conflict occurs, logs and timers will be overwritten.
 					// TODO learning state may need to be extracted from database cache as a result

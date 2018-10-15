@@ -20,6 +20,8 @@ import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.Statement;
 
+import org.apache.commons.lang3.StringUtils;
+
 import net.automatalib.words.Word;
 
 public class Utils {
@@ -81,7 +83,7 @@ public class Utils {
 		ResultSet rs = null;
 		try {
 			stmt = dbConn.createStatement();
-			String qry1 = "SELECT * FROM CACHE WHERE PREFIX_ID = '" + query + "' ORDER BY COUNT DESC, ID ASC;";
+			String qry1 = "SELECT * FROM CACHE WHERE PREFIX_ID = '" + query + "' ORDER BY COUNT DESC, ID ASC";
 			// System.out.println(qry1);
 			rs = stmt.executeQuery(qry1);
 			if (rs.next()) {
@@ -145,19 +147,19 @@ public class Utils {
 	 * responses) and update observation counters.
 	 */
 	public static void cacheStringQueryResponse(String query, String response, Connection dbConn, boolean isOptimsed) {
-		//TODO set is_optimised flag in db cache
+		// TODO maybe remove count increase if is_optimised
 		Statement stmt = null;
 		try {
 			stmt = dbConn.createStatement();
-			stmt.executeUpdate(
-					"INSERT INTO CACHE (PREFIX_ID, RESPONSE, IS_OPTIMISED) " + "VALUES ('" + query + "', '" + response + "', " + (isOptimsed ? 1 : 0)+")");
-				stmt.executeUpdate("UPDATE CACHE SET COUNT = COUNT + 1 WHERE PREFIX_ID = '" + query.toString()
-						+ "' AND RESPONSE = '" + response + "'");
+			stmt.executeUpdate("INSERT INTO CACHE (PREFIX_ID, RESPONSE, IS_OPTIMISED) " + "VALUES ('" + query + "', '"
+					+ response + "', " + (isOptimsed ? 1 : 0) + ")");
+			if(!isOptimsed) stmt.executeUpdate("UPDATE CACHE SET COUNT = COUNT + 1 WHERE PREFIX_ID = '" + query.toString()
+					+ "' AND RESPONSE = '" + response + "'");
 			stmt.close();
 		} catch (Exception e) {
 			if (e.getMessage().contains("UNIQUE")) {
 				try {
-					stmt.executeUpdate("UPDATE CACHE SET COUNT = COUNT + 1 WHERE PREFIX_ID = '" + query
+					if(!isOptimsed) stmt.executeUpdate("UPDATE CACHE SET COUNT = COUNT + 1 WHERE PREFIX_ID = '" + query
 							+ "' AND RESPONSE = '" + response + "'");
 					stmt.close();
 				} catch (Exception e2) {
@@ -167,5 +169,52 @@ public class Utils {
 				System.err.println(e.getClass().getName() + ": " + e.getMessage());
 			}
 		}
+	}
+
+	public static Word<String> responseIfDisabled(String query, Connection dbConn) {
+		// TODO Auto-generated method stub
+		
+		//Find the row with the largest prefix of query, with the greatest number of observations
+		//If it has a disable in it, then yes response is disabled. 
+		
+		String[] splitQuery = query.split("\\s+");
+		StringBuilder sb = new StringBuilder();
+		String sql = "SELECT PREFIX_ID, RESPONSE FROM CACHE WHERE (";
+		for (String s : splitQuery) {
+			sb.append(s);
+			sql = sql + "PREFIX_ID = \"" + sb.toString() + "\" OR ";
+			sb.append(" ");
+		}
+		// Remove final " OR "
+		sql = sql.substring(0, sql.length() - 4);
+		//TODO Verify this ordering
+		sql = sql + ")  ORDER BY LENGTH(PREFIX_ID) DESC, COUNT DESC, ID ASC";
+		Statement stmt = null;
+		ResultSet rs = null;
+		try {
+			stmt = dbConn.createStatement();
+			// System.out.println(qry1);
+			rs = stmt.executeQuery(sql);
+			if (rs.next()) {
+				String resp = rs.getString("RESPONSE");
+				if(!resp.contains(LogOracle.DISABLE_OUTPUT)) return null;
+				int qi = StringUtils.countMatches(query, " ");
+				int ri = StringUtils.countMatches(resp, " ");
+				if (qi < ri) {
+					//TODO CHECK THIS
+					System.out.println("FUCKED IT");
+				} else {
+					for (int j = 0; j < qi - ri; j++) {
+						resp = resp + " -";
+					}
+				}
+				String[] splitResp = resp.trim().split("\\s+");
+				return Word.fromArray(splitResp, 0, splitResp.length);
+			}
+		} catch (Exception e) {
+			System.err.println(e.getClass().getName() + ": " + e.getMessage());
+			return null;
+		}
+		return null;
 	}
 }

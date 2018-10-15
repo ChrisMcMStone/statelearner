@@ -41,6 +41,7 @@ public class LogOracle<I, D> implements MealyMembershipOracle<I, D> {
 		public MealyLogOracle(SUL<I, O> sul, LearnLogger logger, LearningConfig config) {
 			super(sul, logger, config);
 		}
+
 	}
 
 	LearnLogger logger;
@@ -97,6 +98,7 @@ public class LogOracle<I, D> implements MealyMembershipOracle<I, D> {
 
 	public Word<D> answerQuery(Word<I> prefix, Word<I> suffix, boolean cacheLookup) {
 
+		// Check if query has been already cached
 		Word<I> query = prefix.concat(suffix);
 		if (cacheLookup) {
 			Word<D> dbresponse = Utils.cacheLookupQuery(query.toString(), suffix.size(), dbConn);
@@ -107,7 +109,21 @@ public class LogOracle<I, D> implements MealyMembershipOracle<I, D> {
 			}
 		}
 
-		if(time_learn) this.lp.reset();
+		if (time_learn && cacheLookup) {
+			Word<String> resp = Utils.responseIfDisabled(query.toString(), dbConn);
+			if (resp != null) {
+				logger.logQuery("DISABLED [" + prefix.toString() + " | " + suffix.toString() + " /  " + resp + "]");
+				// Utils.cacheStringQueryResponse(query.toString(), resp, dbConn, true);
+				if(suffix.length() == query.length()) {
+					return (Word<D>)resp;
+				} else {
+					return (Word<D>)resp.suffix(suffix.length());
+				}
+			}
+		}
+
+		if (time_learn)
+			this.lp.reset();
 		this.sul.pre();
 
 		try {
@@ -116,15 +132,15 @@ public class LogOracle<I, D> implements MealyMembershipOracle<I, D> {
 			WordBuilder<D> wbPrefixNoTime = new WordBuilder<>(prefix.length());
 			for (I sym : prefix) {
 				D res;
-				if(time_learn) {
-					if(lp.run((String)sym)) {
+				if (time_learn) {
+					if (lp.run((String) sym)) {
 						res = this.sul.step(sym);
-						lp.run((String)res);
+						lp.run((String) res);
 					} else {
-						res = (D)DISABLE_OUTPUT;
+						res = (D) DISABLE_OUTPUT;
 					}
 				} else {
-						res = this.sul.step(sym);
+					res = this.sul.step(sym);
 				}
 				wbPrefix.add(res);
 				wbPrefixNoTime.add((D) Utils.stripTimestamp((String) res));
@@ -135,15 +151,15 @@ public class LogOracle<I, D> implements MealyMembershipOracle<I, D> {
 			WordBuilder<D> wbSuffixNoTime = new WordBuilder<>(prefix.length());
 			for (I sym : suffix) {
 				D res;
-				if(time_learn) {
-					if(lp.run((String)sym)) {
+				if (time_learn) {
+					if (lp.run((String) sym)) {
 						res = this.sul.step(sym);
-						lp.run((String)res);
+						lp.run((String) res);
 					} else {
-						res = (D)DISABLE_OUTPUT;
+						res = (D) DISABLE_OUTPUT;
 					}
 				} else {
-						res = this.sul.step(sym);
+					res = this.sul.step(sym);
 				}
 				wbSuffix.add(res);
 				wbSuffixNoTime.add((D) Utils.stripTimestamp((String) res));
@@ -186,6 +202,13 @@ public class LogOracle<I, D> implements MealyMembershipOracle<I, D> {
 		} finally {
 			sul.post();
 		}
+	}
+
+	/*
+	 * Once query/response accepted by model, carry out optimizations
+	 */
+	public void lpPostProcess() {
+		lp.optimise();
 	}
 
 }
