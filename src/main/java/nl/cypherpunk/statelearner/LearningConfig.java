@@ -167,7 +167,6 @@ public class LearningConfig {
 	}
 
 	private void parseFlows(String p) {
-		// TODO Auto-generated method stub
 		expected_flows = new ArrayList<ArrayList<String[]>>();
 
 		if (StringUtils.countMatches(p, '[') != StringUtils.countMatches(p, ']')) {

@@ -41,7 +41,6 @@ public class Utils {
 	}
 
 	public static byte[] hexToBytes(String hex) {
-		// TODO Check if string contains only hex characters
 		if (hex.length() % 2 != 0)
 			hex = "0" + hex;
 
@@ -150,7 +149,6 @@ public class Utils {
 	 * responses) and update observation counters.
 	 */
 	public static void cacheStringQueryResponse(String query, String response, Connection dbConn, boolean isOptimsed) {
-		// TODO maybe remove count increase if is_optimised
 		if(StringUtils.countMatches(query, " ")!= StringUtils.countMatches(response, " "))
 			System.out.println("THIS SHOULD NOT HAPPEN");
 		Statement stmt = null;
@@ -181,7 +179,6 @@ public class Utils {
 	}
 
 	public static Word<String> responseIfDisabled(String query, Connection dbConn) {
-		// TODO Auto-generated method stub
 
 		// Find the row with the largest prefix of query, with the greatest number of
 		// observations
@@ -212,8 +209,7 @@ public class Utils {
 				int qi = StringUtils.countMatches(query, " ");
 				int ri = StringUtils.countMatches(resp, " ");
 				if (qi < ri) {
-					// TODO CHECK THIS
-					System.out.println("FUCKED IT");
+					// This shouldn't happen, but if it does we can safely return null
 				} else {
 					for (int j = 0; j < qi - ri; j++) {
 						resp = resp + " -";

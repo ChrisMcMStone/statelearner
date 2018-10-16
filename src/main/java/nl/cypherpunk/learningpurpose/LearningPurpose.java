@@ -25,10 +25,10 @@ public class LearningPurpose {
 
 	public LearningPurpose(LearningConfig config) {
 		this.dbConn = config.getDbConn();
-		
-		//Reset/Disable outputs
+
+		// Reset/Disable outputs
 		this.resetOutputs = config.getDisable_outputs();
-		//Inputs enabled after a retransmission observed
+		// Inputs enabled after a retransmission observed
 		this.postRetransInputs = config.getRetrans_enabled();
 		this.query = new WordBuilder<>();
 		this.response = new WordBuilder<>();
@@ -67,14 +67,14 @@ public class LearningPurpose {
 	 */
 	private void state0(String input) {
 		this.query.append(input);
-		this.state=1;
+		this.state = 1;
 	}
 
 	private void state1(String output) {
 		this.response.append(output);
-		if(Utils.stripTimestamp(output).equals(this.last_message)) {
-			this.state=2;
-		} else if(resetOutputs.contains(Utils.stripTimestamp(output))) {
+		if (Utils.stripTimestamp(output).equals(this.last_message)) {
+			this.state = 2;
+		} else if (resetOutputs.contains(Utils.stripTimestamp(output))) {
 			this.state = -1;
 		} else {
 			this.state = 0;
@@ -84,37 +84,43 @@ public class LearningPurpose {
 
 	private void state2(String input) {
 		this.query.append(input);
-		if(postRetransInputs.contains(input)) {
+		if (postRetransInputs.contains(input)) {
 			this.state = 1;
 		} else {
 			this.state = -1;
 		}
 	}
-	
+
 	private void optimiseState2() {
-		for(String s : this.alphabet) {
-			if(!this.postRetransInputs.contains(s)) {
+		if (query.size() != response.size()) {
+			// This shouldn't happen, but if it does we can safely return null
+			return;
+		}
+		for (String s : this.alphabet) {
+			if (!this.postRetransInputs.contains(s)) {
 				String q = this.query.toWord().toString() + " " + s;
 				String r = this.response.toWord().toString() + " " + LogOracle.DISABLE_OUTPUT;
 				Utils.cacheStringQueryResponse(q, r, dbConn, true);
 			}
 		}
 	}
-		
+
 	private void optimiseDisableState() {
-		if(query.size() != response.size())
+		if (query.size() != response.size()) {
+			// This shouldn't happen, but if it does we can safely return null
 			return;
-		for(String s : this.alphabet) {
-				String q = this.query.toWord().toString() + " " + s;
-				String r = this.response.toWord().toString() + " " + LogOracle.DISABLE_OUTPUT;
-				Utils.cacheStringQueryResponse(q, r, dbConn, true);
-			}
+		}
+		for (String s : this.alphabet) {
+			String q = this.query.toWord().toString() + " " + s;
+			String r = this.response.toWord().toString() + " " + LogOracle.DISABLE_OUTPUT;
+			Utils.cacheStringQueryResponse(q, r, dbConn, true);
+		}
 	}
-	
+
 	public void optimise() {
-		if(this.state == 2) {
+		if (this.state == 2) {
 			optimiseState2();
-		} else if(this.state == -1) {
+		} else if (this.state == -1) {
 			optimiseDisableState();
 		}
 	}

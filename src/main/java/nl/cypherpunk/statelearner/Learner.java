@@ -182,10 +182,7 @@ public class Learner {
 
 	public void loadEquivalenceAlgorithm(String algorithm, SimpleAlphabet<String> alphabet, SUL<String, String> sul)
 			throws Exception {
-		// TODO We could combine the two cached oracle to save some queries to the SUL
 		// Create the equivalence oracle
-		// eqOracle = new SULOracle<String, String>(sul);
-		// Add a logging oracle
 		logEqOracle = new MealyLogOracle<String, String>(sul, LearnLogger.getLogger("equivalence_queries"), config);
 		cachedEqOracle = MealyCacheOracle.createDAGCacheOracle(alphabet, null, logEqOracle, config.getDbConn());
 		statsCachedEqOracle = new MealyCounterOracle<String, String>(cachedEqOracle, "equivalence queries to cache");
@@ -216,7 +213,7 @@ public class Learner {
 			throw new Exception("Unknown equivalence algorithm " + config.eqtest);
 		}
 	}
-	
+
 	public SUL<String, String> getSul() {
 		return sul;
 	}
@@ -262,7 +259,6 @@ public class Learner {
 			} else {
 				// Counter example found, update hypothesis and continue learning
 				log.logCounterexample("Counter-example found: " + counterExample.toString());
-				// TODO Add more logging
 				round.increment();
 				log.logPhase("Starting round " + round.getCount());
 
@@ -324,8 +320,6 @@ public class Learner {
 		GraphDOT.write(model, alphabet, psDotFile);
 		psDotFile.close();
 
-		// TODO Check if dot is available
-
 		// Convert .dot to .pdf
 		Runtime.getRuntime().exec("dot -Tpdf -O " + filename);
 	}
@@ -380,8 +374,8 @@ public class Learner {
 		}
 		LearningConfig config = new LearningConfig(args[0]);
 		Learner learner = new Learner(config);
-		
-		//Tell the Learner to use the following timeout value
+
+		// Tell the Learner to use the following timeout value
 		learner.getSul().step("TIMEOUT_MODIFY_" + config.getSmall_timeout());
 
 		if (!config.use_cache) {
@@ -391,7 +385,7 @@ public class Learner {
 			while (true) {
 				try {
 					learner.learn();
-					//TODO delete all timeout entries in cache
+					// TODO delete all timeout entries in cache
 					// tell interface to use big timeout
 					// recover any learned counter examples to recover model with
 					System.exit(0);
