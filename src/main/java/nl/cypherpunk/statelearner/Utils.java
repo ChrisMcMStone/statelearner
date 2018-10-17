@@ -210,6 +210,7 @@ public class Utils {
 				int ri = StringUtils.countMatches(resp, " ");
 				if (qi < ri) {
 					// This shouldn't happen, but if it does we can safely return null
+					return null;
 				} else {
 					for (int j = 0; j < qi - ri; j++) {
 						resp = resp + " -";

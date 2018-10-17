@@ -112,7 +112,8 @@ public class SmartcardTestService {
 	
 	public void reset() throws CardException, InterruptedException {
 		// Reset connection with card
-		card.disconnect(true);//TODO Behaviour of parameter is opposite to API for OpenJDK 1.7? http://bugs.java.com/bugdatabase/view_bug.do?bug_id=7047033
+		card.disconnect(true);
+		//TODO Behaviour of parameter is opposite to API for OpenJDK 1.7? http://bugs.java.com/bugdatabase/view_bug.do?bug_id=7047033
 		
 		// Java 1.7 and lower
 		//card.disconnect(false);

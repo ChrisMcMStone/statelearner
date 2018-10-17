@@ -375,8 +375,10 @@ public class Learner {
 		LearningConfig config = new LearningConfig(args[0]);
 		Learner learner = new Learner(config);
 
-		// Tell the Learner to use the following timeout value
-		learner.getSul().step("TIMEOUT_MODIFY_" + config.getSmall_timeout());
+		if(config.time_learn) {
+			// Tell the Learner to use the following timeout value
+			learner.getSul().step("TIMEOUT_MODIFY_" + config.getSmall_timeout());
+		}
 
 		if (!config.use_cache) {
 			learner.learn();

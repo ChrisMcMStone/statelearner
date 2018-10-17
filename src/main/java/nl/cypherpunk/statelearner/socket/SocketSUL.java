@@ -74,8 +74,6 @@ public class SocketSUL implements SUL<String, String> {
 			System.out.println("Sending symbol: RESET");
 			out.write("RESET\n");
 			out.flush();
-			
-			//TODO Do we need to check the response?
 			in.readLine();
 		} catch (Exception e) {
 			e.printStackTrace();

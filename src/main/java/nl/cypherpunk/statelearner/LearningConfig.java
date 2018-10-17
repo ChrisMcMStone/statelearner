@@ -35,7 +35,8 @@ import net.automatalib.words.impl.SimpleAlphabet;
 /**
  * Configuration class used for learning parameters
  * 
- * @author Joeri de Ruiter (joeri@cs.ru.nl)
+ * @author Joeri de Ruiter (joeri@cs.ru.nl) and Chris McMahon Stone
+ *         (c.mcmahon-stone@cs.bham.ac.uk
  */
 public class LearningConfig {
 	static int TYPE_SMARTCARD = 1;
