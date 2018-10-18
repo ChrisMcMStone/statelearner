@@ -28,6 +28,7 @@ import javax.annotation.ParametersAreNonnullByDefault;
 import net.automatalib.words.Word;
 import net.automatalib.words.WordBuilder;
 import nl.cypherpunk.learningpurpose.LearningPurpose;
+import nl.cypherpunk.learningpurpose.LearningPurposeWiFi;
 import de.learnlib.api.MembershipOracle;
 import de.learnlib.api.MembershipOracle.MealyMembershipOracle;
 import de.learnlib.api.Query;
@@ -50,7 +51,7 @@ public class LogOracle<I, D> implements MealyMembershipOracle<I, D> {
 	ArrayList<ArrayList<String[]>> expected_flows;
 	boolean use_cache = false;
 	boolean time_learn = false;
-	LearningPurpose lp;
+	LearningPurposeWiFi lp;
 	public static String DISABLE_OUTPUT = "-";
 	boolean need_optimise = false;
 
@@ -65,7 +66,7 @@ public class LogOracle<I, D> implements MealyMembershipOracle<I, D> {
 		}
 		if (config.time_learn) {
 			this.time_learn = true;
-			this.lp = new LearningPurpose(config);
+			this.lp = new LearningPurposeWiFi(config);
 		}
 	}
 

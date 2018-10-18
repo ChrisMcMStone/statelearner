@@ -178,7 +178,6 @@ public class LearningConfig {
 
 		// For each flow
 		for (int i = 1; i < no_flows + 1; i++) {
-			System.out.println(StringUtils.countMatches(p, "["));
 			int start = StringUtils.ordinalIndexOf(p, "[", i);
 			int end = StringUtils.ordinalIndexOf(p, "]", i);
 			String flow = p.substring(start + 1, end);

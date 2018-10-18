@@ -49,7 +49,6 @@ public class SocketSUL implements SUL<String, String> {
 		String result = "";
 		try {
 			// Process symbol and return result
-			System.out.println("Sending symbol: " + symbol);
 			out.write(symbol + "\n");
 			out.flush();
 			

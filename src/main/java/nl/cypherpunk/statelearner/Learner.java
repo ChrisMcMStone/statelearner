@@ -261,6 +261,10 @@ public class Learner {
 				log.logCounterexample("Counter-example found: " + counterExample.toString());
 				round.increment();
 				log.logPhase("Starting round " + round.getCount());
+				if(round.getCount() >= 4) {
+					String x = hypothesis.computeOutput(counterExample.getInput()).toString();
+					System.out.println(x);
+				}
 
 				SimpleProfiler.start("Learning");
 				learningAlgorithm.refineHypothesis(counterExample);
